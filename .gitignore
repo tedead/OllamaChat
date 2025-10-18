@@ -1,0 +1,22 @@
+# Visual Studio build artifacts
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.cache
+*.pdb
+*.db
+*.log
+*.tmp
+
+# Ignore temporary files
+*.exe
+*.dll
+
+# VS Code
+.vscode/
+
+# Windows junk
+Thumbs.db
+desktop.ini
