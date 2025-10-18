@@ -1,7 +1,8 @@
+using System.IO;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
-using System.Net.Http;
-using System.IO;
+using System.Text.RegularExpressions;
 
 namespace OllamaChat
 {
@@ -22,6 +23,47 @@ namespace OllamaChat
 
         // File to persist chat memory (set dynamically)
         private string historyFile;
+
+        // --- Improved code block rendering ---
+        private void DisplayBotReply(string reply)
+        {
+            // Split on ``` while keeping order of text/code sections
+            var parts = Regex.Split(reply, "```", RegexOptions.Multiline);
+            bool insideCode = false;
+
+            foreach (var raw in parts)
+            {
+                string segment = raw.Trim('\r', '\n');
+
+                if (insideCode)
+                {
+                    // Remove language identifiers (csharp, cs, etc.)
+                    if (segment.StartsWith("csharp", StringComparison.OrdinalIgnoreCase) ||
+                        segment.StartsWith("cs", StringComparison.OrdinalIgnoreCase))
+                    {
+                        int newlineIndex = segment.IndexOf('\n');
+                        if (newlineIndex > 0)
+                            segment = segment.Substring(newlineIndex + 1);
+                    }
+
+                    // Detect language from fence tag if available
+                    string language = "C#";
+                    if (raw.StartsWith("python", StringComparison.OrdinalIgnoreCase))
+                        language = "Python";
+                    else if (raw.StartsWith("sql", StringComparison.OrdinalIgnoreCase))
+                        language = "SQL";
+
+                    AppendCodeBlock(segment.Trim(), language);
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(segment))
+                        AppendColoredText("Bot: ", segment, Color.Red);
+                }
+
+                insideCode = !insideCode;
+            }
+        }
 
         private string GetSafeHistoryFileName(string modelName)
         {
@@ -102,9 +144,43 @@ namespace OllamaChat
             };
         }
 
+        private void AppendCodeBlock(string code, string language = "C#")
+        {
+            txtChat.AppendText(Environment.NewLine);
+
+            // --- Header bar ---
+            int headerStart = txtChat.TextLength;
+            txtChat.SelectionStart = headerStart;
+            txtChat.SelectionFont = new Font("Segoe UI", 9, FontStyle.Bold);
+            txtChat.SelectionColor = Color.White;
+            txtChat.SelectionBackColor = Color.FromArgb(60, 120, 180); // blue-gray bar
+            txtChat.AppendText($"   {language} code   ");
+            txtChat.AppendText(Environment.NewLine);
+
+            // --- Code body ---
+            int start = txtChat.TextLength;
+            txtChat.SelectionStart = start;
+            txtChat.SelectionColor = Color.DarkGreen;
+            txtChat.SelectionBackColor = Color.FromArgb(240, 240, 240);
+            txtChat.SelectionFont = new Font("Consolas", 10, FontStyle.Regular);
+
+            txtChat.AppendText(code.Trim() + Environment.NewLine + Environment.NewLine);
+
+            // --- Reset formatting ---
+            txtChat.SelectionBackColor = txtChat.BackColor;
+            txtChat.SelectionColor = Color.Black;
+            txtChat.SelectionFont = new Font("Segoe UI", 10, FontStyle.Regular);
+
+            txtChat.SelectionStart = txtChat.TextLength;
+            txtChat.ScrollToCaret();
+        }
+
         public Form1()
         {
             InitializeComponent();
+
+            txtChat.Font = new Font("Consolas", 10, FontStyle.Regular);
+            txtChat.WordWrap = false;
 
             cmbModels.DropDownStyle = ComboBoxStyle.DropDownList;
 
@@ -282,7 +358,9 @@ namespace OllamaChat
             using var doc = JsonDocument.Parse(responseJson);
             string? reply = doc.RootElement.GetProperty("response").GetString() ?? "[No response]";
 
-            AppendColoredText("Bot: ", reply, Color.Red);
+            //AppendColoredText("Bot: ", reply, Color.Red);
+
+            DisplayBotReply(reply);
 
             return reply;
         }
@@ -332,9 +410,23 @@ namespace OllamaChat
             }
 
             string reply = sb.ToString().Trim();
+
             txtChat.AppendText("\n\n");
             txtChat.ScrollToCaret();
+
+            // Re-render formatted version if it contains code fences
+            if (reply.Contains("```"))
+            {
+                txtChat.Clear();
+                DisplayBotReply(reply);
+            }
+
             return reply;
+
+
+            //txtChat.AppendText("\n\n");
+            //txtChat.ScrollToCaret();
+            //return reply;
         }
     }
 }
