@@ -30,10 +30,11 @@
         {
             txtChat = new RichTextBox();
             panel1 = new Panel();
+            btnClearChat = new Button();
             chkStream = new CheckBox();
             btnSend = new Button();
             txtPrompt = new TextBox();
-            btnClearChat = new Button();
+            cmbModels = new ComboBox();
             panel1.SuspendLayout();
             SuspendLayout();
             // 
@@ -48,6 +49,7 @@
             // 
             // panel1
             // 
+            panel1.Controls.Add(cmbModels);
             panel1.Controls.Add(btnClearChat);
             panel1.Controls.Add(chkStream);
             panel1.Controls.Add(btnSend);
@@ -58,11 +60,20 @@
             panel1.Size = new Size(891, 47);
             panel1.TabIndex = 4;
             // 
+            // btnClearChat
+            // 
+            btnClearChat.Location = new Point(765, 12);
+            btnClearChat.Name = "btnClearChat";
+            btnClearChat.Size = new Size(114, 23);
+            btnClearChat.TabIndex = 7;
+            btnClearChat.Text = "Clear Chat History";
+            btnClearChat.UseVisualStyleBackColor = true;
+            // 
             // chkStream
             // 
             chkStream.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
             chkStream.AutoSize = true;
-            chkStream.Location = new Point(553, 14);
+            chkStream.Location = new Point(484, 14);
             chkStream.Name = "chkStream";
             chkStream.Size = new Size(113, 19);
             chkStream.TabIndex = 6;
@@ -72,7 +83,7 @@
             // btnSend
             // 
             btnSend.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
-            btnSend.Location = new Point(472, 11);
+            btnSend.Location = new Point(403, 12);
             btnSend.Name = "btnSend";
             btnSend.Size = new Size(75, 23);
             btnSend.TabIndex = 5;
@@ -84,17 +95,16 @@
             txtPrompt.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left;
             txtPrompt.Location = new Point(12, 12);
             txtPrompt.Name = "txtPrompt";
-            txtPrompt.Size = new Size(454, 23);
+            txtPrompt.Size = new Size(385, 23);
             txtPrompt.TabIndex = 4;
             // 
-            // btnClearChat
+            // cmbModels
             // 
-            btnClearChat.Location = new Point(765, 12);
-            btnClearChat.Name = "btnClearChat";
-            btnClearChat.Size = new Size(114, 23);
-            btnClearChat.TabIndex = 7;
-            btnClearChat.Text = "Clear Chat History";
-            btnClearChat.UseVisualStyleBackColor = true;
+            cmbModels.FormattingEnabled = true;
+            cmbModels.Location = new Point(603, 12);
+            cmbModels.Name = "cmbModels";
+            cmbModels.Size = new Size(156, 23);
+            cmbModels.TabIndex = 8;
             // 
             // Form1
             // 
@@ -118,5 +128,6 @@
         private Button btnSend;
         private TextBox txtPrompt;
         private Button btnClearChat;
+        private ComboBox cmbModels;
     }
 }

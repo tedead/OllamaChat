@@ -7,42 +7,126 @@ namespace OllamaChat
 {
     public partial class Form1 : Form
     {
+        private string modelToUse = "mistral-en";//"phi3-custom"; //"mistral-en";
         private static readonly HttpClient client = new HttpClient();
 
-        //Serializable replacement for tuple
+        // Serializable replacement for tuple
         public class ChatEntry
         {
             public string Role { get; set; } = "";
             public string Text { get; set; } = "";
         }
 
-        //Conversation history
+        // Conversation history
         private readonly List<ChatEntry> chatHistory = new();
 
-        //File to persist chat memory
-        private readonly string historyFile = Path.Combine(Application.StartupPath, "chatHistory.json");
+        // File to persist chat memory (set dynamically)
+        private string historyFile;
+
+        private string GetSafeHistoryFileName(string modelName)
+        {
+            string safeName = string.Join("_", modelName.Split(Path.GetInvalidFileNameChars()))
+                .Replace(":", "_")
+                .Replace("/", "_")
+                .Trim();
+
+            return Path.Combine(Application.StartupPath, $"chatHistory_{safeName}.json");
+        }
+
+        private async Task<List<string>> GetInstalledModelsAsync()
+        {
+            try
+            {
+                var response = await client.GetAsync("http://localhost:11434/api/tags");
+                response.EnsureSuccessStatusCode();
+
+                string json = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(json);
+                var models = new List<string>();
+
+                foreach (var model in doc.RootElement.GetProperty("models").EnumerateArray())
+                {
+                    string name = model.GetProperty("name").GetString() ?? "";
+                    if (!string.IsNullOrEmpty(name))
+                    {
+                        // remove “:latest” if present
+                        name = name.Replace(":latest", "").Trim();
+                        models.Add(name);
+                    }
+                }
+
+                return models;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error fetching models: {ex.Message}", "Ollama", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return new List<string>();
+            }
+        }
+
+        private async Task LoadModelsIntoDropdown()
+        {
+            var models = await GetInstalledModelsAsync();
+            cmbModels.Items.Clear();
+            cmbModels.Items.AddRange(models.ToArray());
+
+            if (models.Count > 0)
+            {
+                cmbModels.SelectedIndex = 0;
+                modelToUse = models[0];
+                //historyFile = Path.Combine(Application.StartupPath, $"chatHistory_{modelToUse}.json");
+
+                string safeModelName = string.Join("_", modelToUse.Split(Path.GetInvalidFileNameChars()))
+                                .Replace(":", "_")
+                                .Replace("/", "_");
+
+                historyFile = Path.Combine(Application.StartupPath, $"chatHistory_{safeModelName}.json");
+
+                LoadChatHistory();
+            }
+
+            cmbModels.SelectedIndexChanged += (s, e) =>
+            {
+                modelToUse = cmbModels.SelectedItem?.ToString() ?? modelToUse;
+                //historyFile = Path.Combine(Application.StartupPath, $"chatHistory_{modelToUse}.json");
+
+                string safeModelName = string.Join("_", modelToUse.Split(Path.GetInvalidFileNameChars()))
+                                .Replace(":", "_")
+                                .Replace("/", "_");
+
+                historyFile = Path.Combine(Application.StartupPath, $"chatHistory_{safeModelName}.json");
+
+                txtChat.Clear();
+                chatHistory.Clear();
+                LoadChatHistory();
+            };
+        }
 
         public Form1()
         {
             InitializeComponent();
+
+            cmbModels.DropDownStyle = ComboBoxStyle.DropDownList;
+
+            // Load models dynamically
+            _ = LoadModelsIntoDropdown();
+
             btnSend.Click += async (s, e) => await SendMessage();
 
-            //Enter key sends message, Shift+Enter adds newline
+            // Enter key sends message, Shift+Enter adds newline
             txtPrompt.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter && !e.Shift)
                 {
-                    e.SuppressKeyPress = true; // prevent newline
-                    btnSend.PerformClick();    // trigger send
+                    e.SuppressKeyPress = true;
+                    btnSend.PerformClick();
                 }
             };
 
-            //Optional clear button hookup if you add one in designer
             if (btnClearChat != null)
                 btnClearChat.Click += (s, e) => ClearChat();
-
-            LoadChatHistory();
         }
+
 
         private void AppendText(string text)
         {
@@ -61,8 +145,7 @@ namespace OllamaChat
             txtChat.ScrollToCaret();
         }
 
-
-        //---------- PERSISTENCE LOGIC ----------
+        // ---------- PERSISTENCE LOGIC ----------
         private void LoadChatHistory()
         {
             try
@@ -79,23 +162,17 @@ namespace OllamaChat
 
                         foreach (var entry in chatHistory)
                         {
-                            //if (entry.Role == "user")
-                            //    AppendText($"You: {entry.Text}\n\n");
-                            //else if (entry.Role == "assistant")
-                            //    AppendText($"Bot: {entry.Text}\n\n");
-
                             if (entry.Role == "user")
                                 AppendColoredText("You: ", entry.Text, Color.Blue);
                             else if (entry.Role == "assistant")
                                 AppendColoredText("Bot: ", entry.Text, Color.Red);
-
                         }
                     }
                 }
             }
             catch
             {
-                //Ignore corrupt file or deserialization errors
+                // Ignore corrupt file or deserialization errors
             }
         }
 
@@ -108,13 +185,13 @@ namespace OllamaChat
             }
             catch
             {
-                //Ignore write errors
+                // Ignore write errors
             }
         }
 
         private void ClearChat()
         {
-            //Confirm before clearing
+            // Confirm before clearing
             var result = MessageBox.Show(
                 "Are you sure you want to delete all chat history?",
                 "Confirm Delete",
@@ -135,13 +212,13 @@ namespace OllamaChat
             }
             catch
             {
-                //Ignore file deletion errors
+                // Ignore file deletion errors
             }
 
             AppendText("[Chat history cleared]\n\n");
         }
 
-        //----------------------------------------
+        // ----------------------------------------
 
         private string BuildPrompt(string newUserMessage)
         {
@@ -161,7 +238,6 @@ namespace OllamaChat
             if (string.IsNullOrEmpty(prompt)) return;
 
             AppendColoredText("You: ", prompt, Color.Blue);
-
             txtPrompt.Clear();
 
             chatHistory.Add(new ChatEntry { Role = "user", Text = prompt });
@@ -170,7 +246,7 @@ namespace OllamaChat
 
             var payload = new
             {
-                model = "mistral-en",
+                model = modelToUse,
                 prompt = fullPrompt,
                 stream = chkStream.Checked
             };
@@ -185,7 +261,7 @@ namespace OllamaChat
 
                 chatHistory.Add(new ChatEntry { Role = "assistant", Text = reply });
 
-                //Save updated chat to disk
+                // Save updated chat to disk
                 SaveChatHistory();
             }
             catch (Exception ex)
@@ -221,7 +297,7 @@ namespace OllamaChat
             using var res = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
             using var reader = new StreamReader(await res.Content.ReadAsStreamAsync());
 
-            //Write the prefix in red, but without trailing newlines
+            // Write the prefix in red, but without trailing newlines
             int start = txtChat.TextLength;
             txtChat.SelectionStart = start;
             txtChat.SelectionColor = Color.Red;
@@ -260,6 +336,5 @@ namespace OllamaChat
             txtChat.ScrollToCaret();
             return reply;
         }
-
     }
 }
